@@ -1,0 +1,23 @@
+{
+  "name": "typescript-exploit",
+  "version": "1.0.0",
+  "description": "",
+  "main": "index.js",
+  "scripts": {
+    "test": "echo \"Error: no test specified\" && exit 1"
+  },
+  "keywords": [],
+  "author": "",
+  "license": "ISC",
+  "devDependencies": {
+    "@types/node": "^17.0.23",
+    "typescript": "^4.7.0-beta"
+  },
+  "dependencies": {
+    "@protobuf-ts/runtime": "^2.4.0",
+    "crc-32": "^1.2.2",
+    "google-protobuf": "^3.20.1-rc.1",
+    "level": "^8.0.0",
+    "ts-protoc-gen": "^0.15.0"
+  }
+}

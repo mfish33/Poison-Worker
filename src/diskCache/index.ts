@@ -1,0 +1,1 @@
+export * as diskCache from "./diskCacheApi"
