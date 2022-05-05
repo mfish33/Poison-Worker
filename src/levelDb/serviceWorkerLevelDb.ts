@@ -23,6 +23,11 @@ function getDb(): Level<Buffer, Buffer> {
     return _db
 }
 
+export async function closeDb() {
+    await _db?.close()
+    _db = undefined
+}
+
 export function addRegistration(url: string) {
     throw new Error("TODO")
 }
