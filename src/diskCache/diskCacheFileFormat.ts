@@ -1,5 +1,7 @@
 import { crc32, staticImplements } from "../utils";
 import { DeSerializableObject, SerializableObject } from "./diskCacheApi";
+import { hash as superFastHash } from "superfasthash"
+import * as crypto from "crypto"
 import * as assert from "assert"
 
 const SIMPLE_DISK_CACHE_VERSION = 5
@@ -22,6 +24,18 @@ export class SimpleFileHeader implements SerializableObject {
         // String
         public readonly key: string
     ) {}
+
+    static new(key: string): SimpleFileHeader {
+        
+        return new SimpleFileHeader(
+            SimpleFileHeader.CORRECT_MAGIC_NUMBER,
+            SIMPLE_DISK_CACHE_VERSION,
+            key.length,
+            // Get uint from the signed number
+            (new Uint32Array([superFastHash(Buffer.from(key))]))[0],
+            key
+        )
+    }
 
     static read(buffer: Buffer) {
         const headerMagicNumber = buffer.readBigUInt64LE(0)
@@ -77,6 +91,18 @@ export function createSimpleFileFooter<T extends SerializableObject>(body: DeSer
             // String
             public readonly body: T
         ) {}
+
+        static new(body: T, hasSha256:false | string) : SimpleFileFooter {
+            const bodyBuffer = body.serialize()
+            const sha256 = hasSha256 ? Buffer.from(crypto.createHash("sha256").update(hasSha256).digest()) : null
+            return new SimpleFileFooter(
+                SimpleFileFooter.CORRECT_MAGIC_NUMBER,
+                sha256,
+                crc32(bodyBuffer),
+                bodyBuffer.length,
+                body
+            )
+        }
 
         static read(buffer: Buffer) {
             // Find magic number by iterating until it is found.
@@ -136,7 +162,13 @@ export function createSimpleFileFooter<T extends SerializableObject>(body: DeSer
                 footerBuffer.writeUInt32LE(calculatedCrc32, 12)
             }
             footerBuffer.writeUInt32LE(serializedBody.length, 16)
-            return this.sha256 ? Buffer.concat([serializedBody, this.sha256, footerBuffer]) : Buffer.concat([serializedBody, footerBuffer])
+
+            let sha256 = Buffer.from("")
+            if(this.sha256) {
+                sha256 = this.sha256
+            }
+
+            return Buffer.concat([serializedBody, sha256, footerBuffer])
         }
     }
 

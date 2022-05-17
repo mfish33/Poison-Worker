@@ -16,6 +16,7 @@
     "strict": true,
     "strictPropertyInitialization": false,
     "types": ["node"],
-    "module": "commonjs"
+    "module": "commonjs",
+    "esModuleInterop": true
   }
 }

@@ -1,7 +1,7 @@
 import { staticImplements } from "../utils";
 import { DeSerializableObject, SerializableObject } from "./diskCacheApi";
 import * as crypto from 'crypto'
-import * as assert from "assert"
+import assert from "assert"
 import { PickleReader } from "./pickle";
 
 // The version of the response info used when persisting response info.
@@ -79,7 +79,7 @@ RESPONSE_INFO_RESTRICTED_PREFETCH = 1 << 26,
 // This bit is set if the response has a nonempty `dns_aliases` entry.
 RESPONSE_INFO_HAS_DNS_ALIASES = 1 << 27;
 
-class HttpResponseHeaders {
+export class HttpResponseHeaders {
 
     public httpVersion:string
     public headers:Record<string, string>
@@ -98,7 +98,7 @@ class HttpResponseHeaders {
 }
 
 @staticImplements<DeSerializableObject<HttpResponseInfo>>()
-class HttpResponseInfo implements SerializableObject {
+export class HttpResponseInfo implements SerializableObject {
     constructor(
         public requestTime:bigint,
         public responseTime:bigint,

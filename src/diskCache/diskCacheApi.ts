@@ -2,6 +2,7 @@ import * as fs from 'fs/promises'
 import { Constructs, staticImplements } from "../utils"
 import * as crypto from "crypto"
 import { createSimpleFileFooter, SimpleFileHeader } from "./diskCacheFileFormat"
+import { HttpResponseInfo } from './httpResponseInfo'
 
 export interface SerializableObject {
     serialize(): Buffer
@@ -167,6 +168,18 @@ export async function get<S extends Streams>(key: string, stream: S): Promise<{s
     }
 
     throw new Error("This code should be unreachable. In: `diskCacheGet`")
+}
+
+export async function writeResourceFile(key: string, stream0: Buffer, stream1: Buffer) {
+    const fileBase = getFileBase()
+    const fileName = getFileName(key, 0)
+    const FooterConstructor = createSimpleFileFooter(BinaryBody)
+    const header = SimpleFileHeader.new(key)
+    const footer1 = FooterConstructor.new(new BinaryBody(stream0), false)
+    const footer2 = FooterConstructor.new(new BinaryBody(stream1), key)
+    const FileZeroConstructor = createFileZeroReader(BinaryBody, BinaryBody)
+    const fileZero = new FileZeroConstructor(header, footer1, footer2)
+    await fs.writeFile(`${fileBase}/${fileName}`, fileZero.serialize())
 }
 
 export async function remove(key: string, stream: Streams) {
