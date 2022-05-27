@@ -2,7 +2,6 @@ import * as fs from 'fs/promises'
 import { Constructs, staticImplements } from "../utils"
 import * as crypto from "crypto"
 import { createSimpleFileFooter, SimpleFileHeader } from "./diskCacheFileFormat"
-import { HttpResponseInfo } from './httpResponseInfo'
 
 export interface SerializableObject {
     serialize(): Buffer
@@ -108,82 +107,70 @@ export enum Streams {
     ServiceWorkerMetadata = 2
 }
 
-function getFileName(key: string, stream: Streams) {
-    const sha1Buffer = crypto.createHash("sha1").update(key).digest()
-    const hashKey = sha1Buffer.readBigUint64LE(0)
-    const fileBase = hashKey.toString(16).padStart(16, "0")
-    return `${fileBase}_${stream == 2 ? 1 : 0}`
-}
-
-
 type DiskCacheReturnType<T extends Streams> = 
     T extends Streams.ServiceWorkerScriptContent ? StringBody :
     T extends Streams.ServiceWorkerRequestInfo ? BinaryBody :
     T extends Streams.ServiceWorkerMetadata ? BinaryBody :
     never
 
-let _fileBase: string | undefined
-export function getFileBase(): string {
-    if(!_fileBase) {
-        throw new Error("Please set a file base in order to use disk cache")
-    }
-    return _fileBase
-}
+export class SwResourceManager {
+    constructor(private fileBase: string){}
 
-export function setFileBase(fileBase: string) {
-    _fileBase = fileBase
-}
-
-export async function get<S extends Streams>(key: string, stream: S): Promise<{save: () => Promise<void>, body: DiskCacheReturnType<S>}> {
-    const fileName = getFileName(key, stream)
-    console.log(`Opening disk cache file: ${fileName}`)
-
-    const fileBase = getFileBase()
-    const fileContents = await fs.readFile(`${fileBase}/${fileName}`)
-    const saveFile = async (buffer: Buffer) => {
-        await fs.writeFile(`${fileBase}/${fileName}`, buffer)
-    }
-    switch(stream) {
-        case Streams.ServiceWorkerScriptContent: {
-            const fileHandle = createFileZeroReader(StringBody, BinaryBody).read(fileContents).result
-            return {
-                save: () => saveFile(fileHandle.serialize()),
-                body: fileHandle.footer1.body
-            }
-        }
-        case Streams.ServiceWorkerRequestInfo: {
-            const fileHandle = createFileZeroReader(StringBody, BinaryBody).read(fileContents).result
-            return {
-                save: () => saveFile(fileHandle.serialize()),
-                body: fileHandle.footer2.body
-            }
-        }
-        case Streams.ServiceWorkerMetadata: {
-            const fileHandle = createFileOneReader(BinaryBody).read(fileContents).result
-            return {
-                save: () => saveFile(fileHandle.serialize()),
-                body: fileHandle.footer.body
-            }
-        }
+    async remove(key: string, stream: Streams) {
+        const fileName = this.getFileName(key, stream)
+        await fs.rm(`${this.fileBase}/${fileName}`)
     }
 
-    throw new Error("This code should be unreachable. In: `diskCacheGet`")
-}
+    async writeResourceFile(key: string, stream0: Buffer, stream1: Buffer) {
+        const fileName = this.getFileName(key, 0)
+        const FooterConstructor = createSimpleFileFooter(BinaryBody)
+        const header = SimpleFileHeader.new(key)
+        const footer1 = FooterConstructor.new(new BinaryBody(stream0), false)
+        const footer2 = FooterConstructor.new(new BinaryBody(stream1), key)
+        const FileZeroConstructor = createFileZeroReader(BinaryBody, BinaryBody)
+        const fileZero = new FileZeroConstructor(header, footer1, footer2)
+        await fs.writeFile(`${this.fileBase}/${fileName}`, fileZero.serialize())
+    }
 
-export async function writeResourceFile(key: string, stream0: Buffer, stream1: Buffer) {
-    const fileBase = getFileBase()
-    const fileName = getFileName(key, 0)
-    const FooterConstructor = createSimpleFileFooter(BinaryBody)
-    const header = SimpleFileHeader.new(key)
-    const footer1 = FooterConstructor.new(new BinaryBody(stream0), false)
-    const footer2 = FooterConstructor.new(new BinaryBody(stream1), key)
-    const FileZeroConstructor = createFileZeroReader(BinaryBody, BinaryBody)
-    const fileZero = new FileZeroConstructor(header, footer1, footer2)
-    await fs.writeFile(`${fileBase}/${fileName}`, fileZero.serialize())
-}
+    async get<S extends Streams>(key: string, stream: S): Promise<{save: () => Promise<void>, body: DiskCacheReturnType<S>}> {
+        const fileName = this.getFileName(key, stream)
+        console.log(`Opening disk cache file: ${fileName}`)
 
-export async function remove(key: string, stream: Streams) {
-    const fileName = getFileName(key, stream)
-    const fileBase = getFileBase()
-    await fs.rm(`${fileBase}/${fileName}`)
+        const fileContents = await fs.readFile(`${this.fileBase}/${fileName}`)
+        const saveFile = async (buffer: Buffer) => {
+            await fs.writeFile(`${this.fileBase}/${fileName}`, buffer)
+        }
+        switch(stream) {
+            case Streams.ServiceWorkerScriptContent: {
+                const fileHandle = createFileZeroReader(StringBody, BinaryBody).read(fileContents).result
+                return {
+                    save: () => saveFile(fileHandle.serialize()),
+                    body: fileHandle.footer1.body
+                }
+            }
+            case Streams.ServiceWorkerRequestInfo: {
+                const fileHandle = createFileZeroReader(StringBody, BinaryBody).read(fileContents).result
+                return {
+                    save: () => saveFile(fileHandle.serialize()),
+                    body: fileHandle.footer2.body
+                }
+            }
+            case Streams.ServiceWorkerMetadata: {
+                const fileHandle = createFileOneReader(BinaryBody).read(fileContents).result
+                return {
+                    save: () => saveFile(fileHandle.serialize()),
+                    body: fileHandle.footer.body
+                }
+            }
+        }
+    
+        throw new Error("This code should be unreachable. In: `diskCacheGet`")
+    }
+
+    private getFileName(key: string, stream: Streams) {
+        const sha1Buffer = crypto.createHash("sha1").update(key).digest()
+        const hashKey = sha1Buffer.readBigUint64LE(0)
+        const fileBase = hashKey.toString(16).padStart(16, "0")
+        return `${fileBase}_${stream == 2 ? 1 : 0}`
+    }
 }

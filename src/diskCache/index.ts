@@ -1,1 +1,1 @@
-export * as diskCache from "./diskCacheApi"
+export * from "./diskCacheApi"

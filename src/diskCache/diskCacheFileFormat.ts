@@ -154,7 +154,6 @@ export function createSimpleFileFooter<T extends SerializableObject>(body: DeSer
             const footerBuffer = Buffer.alloc(SimpleFileFooter.SimpleFileFooterSize, 0)
             assert.equal(this.footerMagicNumber, SimpleFileFooter.CORRECT_MAGIC_NUMBER)
             footerBuffer.writeBigUInt64LE(this.footerMagicNumber)
-            // TODO: FIX THIS. It should be a bitwise operation
             const footerFlags = (this.bodyCrc32 ? SimpleFileFooter.FLAG_HAS_CRC32 : 0) + (this.sha256 ? SimpleFileFooter.FLAG_HAS_KEY_SHA256 : 0)
             footerBuffer.writeUInt32LE(footerFlags, 8)
             if(this.bodyCrc32) {

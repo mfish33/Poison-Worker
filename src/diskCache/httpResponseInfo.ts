@@ -148,7 +148,7 @@ export class HttpResponseInfo implements SerializableObject {
         }
 
         if (flags & RESPONSE_INFO_HAS_VARY_DATA) {
-            console.log("If this gets tripped go implement vary data reading")
+            console.error("If this gets tripped go implement vary data reading")
             process.exit(1)
         }
 

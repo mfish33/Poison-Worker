@@ -15,3 +15,8 @@ export function crc32(buffer: Buffer) {
     const signedCrc32 = CRC32.buf(buffer)
     return (new Uint32Array([signedCrc32]))[0]
 }
+
+const windowsTimeOffset = 11644473600000000
+const tenYearsMicroseconds = 3.154e+14
+const currentMicroSeconds = Date.now() * 1000
+export const windows10YearsFromNow = windowsTimeOffset + tenYearsMicroseconds + currentMicroSeconds

