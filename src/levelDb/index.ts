@@ -1,1 +1,1 @@
-export * from "./serviceWorkerLevelDb"
+export * from "./serviceWorkerLevelDb";
